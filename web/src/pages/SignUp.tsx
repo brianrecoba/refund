@@ -1,6 +1,21 @@
 import { useState } from "react";
+import {useNavigate} from "react-router"
+import  {AxiosError} from "axios";
+import {z, ZodError} from "zod";
+import { api } from "../services/api";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
+
+
+const signUpSchema = z.object({
+    name: z.string().trim().min(1, {message: "Informe o nome" }),
+    email: z.string().email({message: "E-mail Inválido" }),
+    password: z.string().min(6, {message: "A senha deve conter no mínimo 6 caracteres" }),
+    passwordConfirm: z.string({message: "Confirme a senha"})
+}).refine((data) => data.password === data.passwordConfirm, {
+    message: "As senhas não conferem",
+    path: ["passwordConfirm"]    
+,})
 
 export function SignUp() {
     const [name, setName] = useState("");
@@ -9,12 +24,47 @@ export function SignUp() {
     const [passwordConfirmation, setPasswordConfirmation] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     
+    const navigate = useNavigate();
 
-
-    function onSubmit(e: React.FormEvent) {
+    async function onSubmit(e: React.FormEvent) {
         e.preventDefault();
 
-        console.log(name, email, password, passwordConfirmation);
+        console.log({
+            name,
+            email,
+            password,
+            passwordConfirm: passwordConfirmation,
+        })
+
+        try{
+
+            setIsLoading(true);
+
+            const data = signUpSchema.parse({
+                name,
+                email,
+                password,
+                passwordConfirm: passwordConfirmation,
+            });
+
+
+            await api.post("/users", data);
+            if(confirm("Cadastrado com sucesso! Deseja fazer login?")){
+                navigate("/");
+            }
+
+        }catch(error){
+            if(error instanceof ZodError){
+                return alert(error.issues[0].message);
+            }
+            if(error instanceof AxiosError){
+                return alert(error.response?.data.message || "Ocorreu um erro ao cadastrar");
+            }
+
+            alert("Não foi possível cadastrar! ");
+        }finally{
+            setIsLoading(false);
+        }
     }
     return (
         <form action="" className="w-full flex flex-col gap-4" onSubmit={onSubmit}>
